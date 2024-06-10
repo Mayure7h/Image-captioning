@@ -1,2 +1,2 @@
 # Image-captioning
-IIT Intership
+IIT Interenship
