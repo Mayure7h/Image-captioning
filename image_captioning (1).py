@@ -652,3 +652,88 @@ this example easily runnable, we have trained it with a few constraints, like a 
 number of attention heads. To improve the predictions, you can try changing these training
 settings and find a good model for your use case.
 """
+
+
+import cv2
+import os
+
+def extract_frames(video_path, output_folder, frame_rate=1):
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    video_capture = cv2.VideoCapture(video_path)
+    fps = video_capture.get(cv2.CAP_PROP_FPS)
+    frame_interval = int(fps / frame_rate)
+    frame_count = 0
+    success, frame = video_capture.read()
+
+    while success:
+        if frame_count % frame_interval == 0:
+            frame_filename = os.path.join(output_folder, f'frame_{frame_count:04d}.jpg')
+            cv2.imwrite(frame_filename, frame)
+
+        success, frame = video_capture.read()
+        frame_count += 1
+
+    video_capture.release()
+    print(f"Extracted frames are saved to {output_folder}")
+
+# Example usage
+video_path = '/content/Ses01F_script01_1.mp4'
+output_folder = '/content/extracted frames'
+extract_frames(video_path, output_folder)
+
+
+
+
+import os
+import cv2
+import numpy as np
+import tensorflow as tf
+import matplotlib.pyplot as plt
+
+vocab = vectorization.get_vocabulary()
+index_lookup = dict(zip(range(len(vocab)), vocab))
+max_decoded_sentence_length = SEQ_LENGTH - 1
+
+def generate_caption(image_path):
+    # Read the image from the disk
+    sample_img = decode_and_resize(image_path)
+    img = sample_img.numpy().clip(0, 255).astype(np.uint8)
+    plt.imshow(img)
+    plt.show()
+
+    # Pass the image to the CNN
+    img = tf.expand_dims(sample_img, 0)
+    img = caption_model.cnn_model(img)
+
+    # Pass the image features to the Transformer encoder
+    encoded_img = caption_model.encoder(img, training=False)
+
+    # Generate the caption using the Transformer decoder
+    decoded_caption = "<start> "
+    for i in range(max_decoded_sentence_length):
+        tokenized_caption = vectorization([decoded_caption])[:, :-1]
+        mask = tf.math.not_equal(tokenized_caption, 0)
+        predictions = caption_model.decoder(
+            tokenized_caption, encoded_img, training=False, mask=mask
+        )
+        sampled_token_index = np.argmax(predictions[0, i, :])
+        sampled_token = index_lookup[sampled_token_index]
+        if (sampled_token == "<end>"):
+            break
+        decoded_caption += " " + sampled_token
+
+    decoded_caption = decoded_caption.replace("<start> ", "")
+    decoded_caption = decoded_caption.replace(" <end>", "").strip()
+    print("Predicted Caption: ", decoded_caption)
+
+def generate_captions_for_folder(folder_path, num_images=20):
+    image_files = [f for f in os.listdir(folder_path) if f.endswith('.jpg')]
+    for image_file in image_files[:num_images]:  # Process only the first num_images files
+        image_path = os.path.join(folder_path, image_file)
+        generate_caption(image_path)
+
+# Example usage
+output_folder = r'/content/extracted frames'
+generate_captions_for_folder(output_folder, num_images=10)
